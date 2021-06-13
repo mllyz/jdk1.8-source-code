@@ -1496,6 +1496,35 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
+     * -------------------------------------判断当前线程是否排队-------------------------------------
+     * 一、h != t 的分析
+     *     1、队列没有初始化（h!=t成立）。可以直接去cas加锁
+     *     2、队列已经初始化
+     *          2.1
+     *                  那么h!=t则成立；（不绝对，还有第3种情况） h != t 返回true；但是由于是&&运算，
+     *                  故而代码还需要进行后续的判断
+     *                  (有人可能会疑问，比如队列初始化了；里面只有一个数据，那么头和尾都是同一个怎么会成立呢？
+     *                  其实这是第3种情况--对头等于对尾；但是这里先不考虑，我们假设现在队列里面有大于1个数据 )
+     *                  大于1个数据则成立;继续判断把h.next赋值给s；s是 对头 的下一个Node，
+     *                  这个时候s则表示他是队列当中参与排队的线程而且是排在最前面的；
+     *                  为什么是s最前面不是h嘛？诚然h是队列里面的第一个，但是不是排队的第一个；下文有详细解释
+     *                  因为h也就是对头对应的Node对象或者线程他是持有锁的，但是不参与排队；
+     *                  这个很好理解，比如你去买车票，你如果是第一个这个时候售票员已经在给你服务了，你不算排队，你后面的才算排队；
+     *                  队列里面的h是不参与排队的这点一定要明白；参考下面关于队列初始化的解释；
+     *                  因为h要么是虚拟出来的节点，要么是持有锁的节点；什么时候是虚拟的呢？什么时候是持有锁的节点呢？下文分析
+     *                  然后判断s是否等于空，其实就是判断队列里面是否只有一个数据；
+     *                  假设队列大于1个，那么肯定不成立（s==null---->false），因为大于一个Node的时候h.next肯定不为空；
+     *                  由于是||运算如果返回false，还要判断s.thread != Thread.currentThread()；这里又分为两种情况
+     *                        2.1.1
+     *                            s.thread != Thread.currentThread() 返回true，就是当前线程不等于在排队的第一个线程s；
+     *                            那么这个时候整体结果就是h!=t：true; （s==null false || s.thread != Thread.currentThread() true  最后true）
+     *                            结果： true && true 方法最终放回true，所以需要去排队
+     *
+     *                       2.1.2
+     *                            s.thread != Thread.currentThread() 返回false 表示当前来参与竞争锁的线程和第一个排队的线程是同一个线程
+     *                            这个时候整体结果就是h!=t---->true; （s==null false || s.thread != Thread.currentThread() false-----> 最后false）
+     *                            结果：true && false 方法最终放回false，所以不需要去排队
+     *
      * Queries whether any threads have been waiting to acquire longer
      * than the current thread.
      *

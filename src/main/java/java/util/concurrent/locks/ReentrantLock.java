@@ -201,6 +201,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         /**
          * Performs lock.  Try immediate barge, backing up to normal
          * acquire on failure.
+         * 与公平锁相比，先进性一次cas的操作，失败会进行cas等待
          */
         final void lock() {
             if (compareAndSetState(0, 1))
@@ -216,6 +217,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
 
     /**
      * Sync object for fair locks
+     * 公平锁实现
      */
     static final class FairSync extends Sync {
         private static final long serialVersionUID = -3000897897090466540L;
@@ -227,17 +229,25 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         /**
          * Fair version of tryAcquire.  Don't grant access unless
          * recursive call or no waiters or is first.
+         * tryAcquire 的公平实现
          */
         protected final boolean tryAcquire(int acquires) {
             final Thread current = Thread.currentThread();
+            // 0 表示自由状态，1 表示加锁，大于1 表示重入
             int c = getState();
             if (c == 0) {
+                /*
+                 * hasQueuedPredecessors  判断是否需要排队
+                 * compareAndSetState 设置状态
+                 * setExclusiveOwnerThread 设置当前线程为拥有锁的线程(方便后面进行重入的判断)
+                 */
                 if (!hasQueuedPredecessors() &&
                     compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);
                     return true;
                 }
             }
+            // state != 0 ,且当前线程就是拥有锁的线程，state +1 进行重入，这里也表明 reentrentlck 是可重入的
             else if (current == getExclusiveOwnerThread()) {
                 int nextc = c + acquires;
                 if (nextc < 0)
