@@ -149,7 +149,11 @@ import java.util.concurrent.locks.AbstractQueuedSynchronizer;
  * <a href="package-summary.html#MemoryVisibility"><i>happen-before</i></a>
  * actions following a successful "acquire" method such as {@code acquire()}
  * in another thread.
- *
+ * 使用Semaphore可以控制同时访问资源的线程的个数。
+ * 可以理解为Semaphore有n个许可，
+ * 只有成功获得许可的线程才能访问临界区，
+ * 线程使用完后会将许可返还给Semaphore，
+ * 从而实现同时访问资源的线程的最大个数
  * @since 1.5
  * @author Doug Lea
  */
@@ -240,12 +244,20 @@ public class Semaphore implements java.io.Serializable {
             super(permits);
         }
 
+        /**
+         * @param acquires
+         * @return 如果返回值小于0，表示当前线程共享信号量资源失败，否则表示成功
+         */
         protected int tryAcquireShared(int acquires) {
             for (;;) {
                 if (hasQueuedPredecessors())
                     return -1;
                 int available = getState();
+                // remaining为available减去需要获取的信号量资源数量之后的差值
                 int remaining = available - acquires;
+                //如果remaining小于0，那么返回remaining值，由于是负数，因此获取失败
+                //如果大于等于0，那么表示可以获取成功，尝试CAS的更新state，
+                // 更新成功之后同样返回remaining，由于是大于等于0的数，因此获取成功
                 if (remaining < 0 ||
                     compareAndSetState(available, remaining))
                     return remaining;
@@ -281,6 +293,7 @@ public class Semaphore implements java.io.Serializable {
     }
 
     /**
+     *  从信号量获取一个信号量，没有则一直阻塞，直到在其他线程提供信号量并唤醒或者线程被中断。
      * Acquires a permit from this semaphore, blocking until one is
      * available, or the thread is {@linkplain Thread#interrupt interrupted}.
      *
@@ -457,7 +470,7 @@ public class Semaphore implements java.io.Serializable {
      * Any permits that were to be assigned to this thread are instead
      * assigned to other threads trying to acquire permits, as if
      * permits had been made available by a call to {@link #release()}.
-     *
+     * 从信号量获取permits个信号量，没有则一直阻塞，直到在其他线程提供信号量并唤醒或者线程被中断
      * @param permits the number of permits to acquire
      * @throws InterruptedException if the current thread is interrupted
      * @throws IllegalArgumentException if {@code permits} is negative
