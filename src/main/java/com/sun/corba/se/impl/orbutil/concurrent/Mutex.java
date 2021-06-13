@@ -125,6 +125,7 @@ package com.sun.corba.se.impl.orbutil.concurrent;
  *
  *    // ...  other similar traversal and update methods ...
  * }
+ * 不可充入的互斥锁，锁资源（AQS里的state）只有两种状态：0表示未锁定，1表示锁定。
  * </pre>
  * <p>
  * @see Semaphore
